@@ -227,6 +227,22 @@ app.delete("/api/admin/inventory/delete/:id", auth, isAdmin, async (req, res) =>
   }
 });
 
+app.post('/api/contact', (req, res) => {
+    const { firstName, lastName, mobile, email, reqDate, city, query } = req.body;
+    
+    const sql = `INSERT INTO contact_messages 
+    (first_name, last_name, mobile, email, req_date, city, query_text) 
+    VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+    db.query(sql, [firstName, lastName, mobile, email, reqDate, city, query], (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Database error" });
+        }
+        res.status(200).json({ message: "Message sent successfully!" });
+    });
+});
+
 // ... Keep your other cart/delete routes below as they were ...
 
 app.use("/api/auth", authRoutes);
