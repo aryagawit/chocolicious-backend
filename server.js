@@ -59,7 +59,7 @@ const cartRoutes = require("./routes/cartRoutes");
 const app = express();
 
 app.use(cors({
-  origin: "http://localhost:3000", 
+  origin: ["http://localhost:3000", "https://your-firebase-app-url.web.app"], 
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
