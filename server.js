@@ -8,7 +8,7 @@ const db = mysql.createPool({
   host: "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
   port: 4000,
   user: "4FmVqdMoeFfBEMV.root",
-  password: "aG1Oag27hhRFwhOj",
+  password: process.env.DB_PASSWORD,
   database: "chocolicious_db",
   ssl: {
     minVersion: 'TLSv1.2',
