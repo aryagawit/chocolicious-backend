@@ -5,11 +5,11 @@ const mysql = require("mysql2/promise");
 const jwt = require("jsonwebtoken"); // Ensure you have this for token verification
 
 const db = mysql.createPool({
-  host: "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
-  port: 4000,
-  user: "4FmVqdMoeFfBEMV.root",
+  host: process.env.DB_HOST, // Use this!
+  port: process.env.DB_PORT || 4000,
+  user: process.env.DB_USER, // Use this!
   password: process.env.DB_PASSWORD,
-  database: "chocolicious_db",
+  database: process.env.DB_NAME,
   ssl: {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: true
