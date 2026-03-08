@@ -54,7 +54,7 @@ exports.verifyOTP = async (req, res) => {
   success: true, // Helpful for the frontend check
   token, 
   phone: user.phone, // Adding this to match your frontend destructuring
-  name: user.full_name,
+  name: user.name,
   is_admin: user.is_admin, // CRITICAL: This enables the Admin Dashboard
   isNewUser: !user.name 
 });
