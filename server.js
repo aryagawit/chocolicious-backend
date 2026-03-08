@@ -59,7 +59,12 @@ const cartRoutes = require("./routes/cartRoutes");
 const app = express();
 
 app.use(cors({
-  origin: ["http://localhost:3000", "https://your-firebase-app-url.web.app"], 
+  // Replace the placeholder with your actual live URL
+  origin: [
+    "http://localhost:3000", 
+    "https://chocolicious.vercel.app", // Your Vercel URL
+    "https://www.chocolicious.in"      // Your custom domain (if you have one)
+  ], 
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
