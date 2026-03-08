@@ -58,9 +58,13 @@ exports.verifyOTP = async (req, res) => {
   is_admin: user.is_admin, // CRITICAL: This enables the Admin Dashboard
   isNewUser: !user.name 
 });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
+}catch (err) {
+    console.error("DEBUG ERROR:", err); // This shows in Render Logs
+    res.status(500).json({ 
+        message: "Server error", 
+        detail: err.message, // This will show in your browser's Network tab
+        stack: err.stack 
+    });
 };
 
 // ----------------- (OPTIONAL) SET PASSWORD -----------------
