@@ -62,7 +62,7 @@ app.use(cors({
   // Replace the placeholder with your actual live URL
   origin: [
     "http://localhost:3000", 
-    "https://chocolicious.vercel.app", // Your Vercel URL
+    "https://chocolicious-frontend.vercel.app", // Your Vercel URL
     "https://www.chocolicious.in"      // Your custom domain (if you have one)
   ], 
   methods: ["GET", "POST", "PUT", "DELETE"],
