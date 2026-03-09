@@ -53,18 +53,19 @@ router.get("/profile", auth, async (req, res) => {
 router.put("/profile", auth, async (req, res) => {
   try {
     const { name, phone, email, gender, dob, anniversary, address } = req.body;
-    
-    // Formatting for null safety
+
+    // 1. Format values for SQL (Handle empty strings as NULL)
+    const formattedPhone = phone && phone.trim() !== "" ? phone : null;
     const formattedEmail = email && email.trim() !== "" ? email : null;
     const formattedDob = dob && dob !== "" ? dob : null;
     const formattedAnniversary = anniversary && anniversary !== "" ? anniversary : null;
 
-    // FIX: Added missing comma after phone=? and matched array order to placeholders
-    await db.query(
+    // 2. Updated SQL with correct commas and parameter order
+    const [result] = await db.query(
       "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
       [
         name,                 // 1st ?
-        phone,                // 2nd ? -> Now correctly maps to phone column
+        formattedPhone,       // 2nd ? -> Handles the UNIQUE constraint safely
         formattedEmail,       // 3rd ?
         gender,               // 4th ?
         formattedDob,         // 5th ?
@@ -74,10 +75,19 @@ router.put("/profile", auth, async (req, res) => {
       ]
     );
 
-    res.json({ success: true, message: "Profile updated successfully! 🧁" });
+    res.json({ success: true, message: "Profile updated! 🧁" });
+
   } catch (err) {
+    // 3. Catch Duplicate Entry Error (Error Code 1062)
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "This phone number or email is already in use by another account." 
+      });
+    }
+    
     console.error("Profile Update Error:", err);
-    res.status(500).json({ success: false, message: "Failed to update profile" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
