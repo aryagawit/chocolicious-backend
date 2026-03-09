@@ -53,37 +53,31 @@ router.get("/profile", auth, async (req, res) => {
 router.put("/profile", auth, async (req, res) => {
   try {
     const { name, phone, email, gender, dob, anniversary, address } = req.body;
-
-    // 1. Cleaning up values to handle nulls correctly
+    
+    // Formatting for null safety
     const formattedEmail = email && email.trim() !== "" ? email : null;
     const formattedDob = dob && dob !== "" ? dob : null;
     const formattedAnniversary = anniversary && anniversary !== "" ? anniversary : null;
 
-    // 2. Fixed SQL Syntax (Added missing commas)
-    // 3. Fixed Parameter Order (Must match the '?' sequence exactly)
-    // Fixed SQL String and Array Mapping
-await db.query(
-  "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
-  [
-    name,                 // 1st ? -> name
-    phone,                // 2nd ? -> phone (THIS was missing/misplaced)
-    formattedEmail,       // 3rd ? -> email
-    gender,               // 4th ? -> gender
-    formattedDob,         // 5th ? -> dob
-    formattedAnniversary, // 6th ? -> anniversary
-    address,              // 7th ? -> address
-    req.user.id           // 8th ? -> WHERE id
-  ]
-);
+    // FIX: Added missing comma after phone=? and matched array order to placeholders
+    await db.query(
+      "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
+      [
+        name,                 // 1st ?
+        phone,                // 2nd ? -> Now correctly maps to phone column
+        formattedEmail,       // 3rd ?
+        gender,               // 4th ?
+        formattedDob,         // 5th ?
+        formattedAnniversary, // 6th ?
+        address,              // 7th ?
+        req.user.id           // 8th ? (WHERE id=)
+      ]
+    );
 
-
-    res.json({ message: "Profile updated successfully" });
+    res.json({ success: true, message: "Profile updated successfully! 🧁" });
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: "This email is already in use by another account." });
-    }
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Profile Update Error:", err);
+    res.status(500).json({ success: false, message: "Failed to update profile" });
   }
 });
 
