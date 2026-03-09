@@ -241,5 +241,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
 
-const PORT = process.env.PORT || 5050;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 10000; // Render usually uses 10000
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server is live on port ${PORT}`);
+});
