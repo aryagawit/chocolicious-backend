@@ -33,7 +33,7 @@ router.get("/profile", auth, async (req, res) => {
   try {
     // We use req.user.id from the 'auth' middleware to find the right person
     const [rows] = await db.query(
-      "SELECT name, email, gender, dob, anniversary, address FROM users WHERE id = ?",
+      "SELECT name, phone, email, gender, dob, anniversary, address FROM users WHERE id = ?",
       [req.user.id]
     );
 
@@ -52,16 +52,28 @@ router.get("/profile", auth, async (req, res) => {
 // UPDATE PROFILE
 router.put("/profile", auth, async (req, res) => {
   try {
-    const { name, email, gender, dob, anniversary, address } = req.body;
-const formattedEmail = email && email.trim() !== "" ? email : null;
-const formattedDob = dob && dob !== "" ? dob : null;
-const formattedAnniversary = anniversary && anniversary !== "" ? anniversary : null;
+    const { name, phone, email, gender, dob, anniversary, address } = req.body;
 
-await db.query(
-  "UPDATE users SET name=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
-  [name, email, gender, formattedDob, formattedAnniversary, address, req.user.id]
-);
+    // 1. Cleaning up values to handle nulls correctly
+    const formattedEmail = email && email.trim() !== "" ? email : null;
+    const formattedDob = dob && dob !== "" ? dob : null;
+    const formattedAnniversary = anniversary && anniversary !== "" ? anniversary : null;
 
+    // 2. Fixed SQL Syntax (Added missing commas)
+    // 3. Fixed Parameter Order (Must match the '?' sequence exactly)
+    await db.query(
+      "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
+      [
+        name,           // 1st ?
+        phone,          // 2nd ?
+        formattedEmail, // 3rd ?
+        gender,         // 4th ?
+        formattedDob,   // 5th ?
+        formattedAnniversary, // 6th ?
+        address,        // 7th ?
+        req.user.id     // 8th ? (WHERE id=)
+      ]
+    );
 
 
     res.json({ message: "Profile updated successfully" });
