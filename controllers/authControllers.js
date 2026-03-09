@@ -2,144 +2,49 @@ const db = require("../config/db");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-// Helper: Generate 6-digit OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
-
-// ----------------- STEP 1: REQUEST OTP -----------------
-exports.requestOTP = async (req, res) => {
-  try {
-    const { phone } = req.body;
-
-    if (!phone) return res.status(400).json({ message: "Phone number is required" });
-
-    // 1. Check if user exists
-    const [existing] = await db.query("SELECT * FROM users WHERE phone = ?", [phone]);
-    const otp = generateOTP();
-
-    if (existing.length === 0) {
-      // 2. Register new user (initially unverified)
-      await db.query(
-        "INSERT INTO users (phone, otp, is_verified) VALUES (?, ?, FALSE)",
-        [phone, otp]
-      );
-    } else {
-      // 3. Update OTP for existing user
-      await db.query("UPDATE users SET otp = ? WHERE phone = ?", [otp, phone]);
-    }
-
-    // In production, you'd trigger an SMS API here
-    console.log(` OTP for ${phone}: ${otp}`); 
-    
-    res.json({ message: "OTP sent successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// ----------------- STEP 2: VERIFY OTP & AUTO-LOGIN -----------------
-exports.verifyOTP = async (req, res) => {
-  try {
-    const { phone, otp } = req.body;
-    
-    // 1. Log the attempt for debugging (check your Render logs)
-    console.log(`Attempting verification for ${phone} with OTP: ${otp}`);
-
-    // 2. Fetch user (ensure phone number format matches what was stored)
-    const [users] = await db.query("SELECT * FROM users WHERE phone = ? AND otp = ?", [phone, otp]);
-
-    if (users.length === 0) {
-      // This is where your "Invalid OTP" error is coming from
-      return res.status(400).json({ message: "Invalid OTP" });
-    }
-
-    const user = users[0];
-
-    // 3. Mark as verified and CLEAR the OTP so it can't be reused
-    await db.query("UPDATE users SET is_verified = TRUE, otp = NULL WHERE id = ?", [user.id]);
-
-    // 4. Generate Token
-    const token = jwt.sign(
-      { id: user.id, is_admin: user.is_admin }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: "7d" }
-    );
-
-    // 5. Success Response
-    res.json({ 
-      success: true, 
-      token, 
-      user: {
-        phone: user.phone, 
-        name: user.name || "Valued Customer", // Fallback if name is null
-        is_admin: user.is_admin 
-      }
-    });
-  } catch (err) {
-    console.error("Auth Error:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
-  }
-};
-// ----------------- (OPTIONAL) SET PASSWORD -----------------
-exports.setPassword = async (req, res) => {
-  try {
-    const { phone, password } = req.body;
-    if (!phone || !password) return res.status(400).json({ message: "Data missing" });
-
-    const hashed = await bcrypt.hash(password, 10);
-    await db.query("UPDATE users SET password = ? WHERE phone = ?", [hashed, phone]);
-
-    res.json({ message: "Password updated successfully" });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-}
-
-// ----------------- LOGIN (Traditional Email/Phone + Password) -----------------
+// ----------------- LOGIN (Email + Password) -----------------
 exports.login = async (req, res) => {
   try {
-    const { email, phone, password } = req.body;
+    const { email, password } = req.body;
 
-    // 1. Validation: Must provide password and either email or phone
-    if (!password || (!email && !phone)) {
-      return res.status(400).json({ message: "Provide email or phone and password" });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Please provide both email and password" });
     }
 
-    // 2. Find user by email OR phone
-    const [users] = await db.query(
-      "SELECT * FROM users WHERE phone = ?",
-      [phone]
-    );
+    // 1. Find user by email
+    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
 
     if (users.length === 0) {
-      return res.status(400).json({ message: "User not found" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const user = users[0];
 
-    // 3. Check if account is verified
-    if (!user.is_verified) {
-      return res.status(403).json({ message: "Please verify your account first" });
+    // 2. Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // 4. Compare passwords
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // 5. Generate JWT Token
+    // 3. Generate JWT Token
     const token = jwt.sign(
-      { id: user.id, phone: user.phone, is_admin: user.is_admin }, 
+      { id: user.id, is_admin: user.is_admin }, 
       process.env.JWT_SECRET, 
       { expiresIn: "24h" }
     );
 
-    // 6. Send response
+    // 4. Send response
     res.json({ 
+      success: true,
       message: "Login successful",
       token, 
-      user: { id: user.id, email: user.email, phone: user.phone } 
+      user: { 
+        id: user.id, 
+        name: user.name, 
+        email: user.email, 
+        phone: user.phone,
+        is_admin: user.is_admin 
+      } 
     });
 
   } catch (err) {
@@ -148,35 +53,35 @@ exports.login = async (req, res) => {
   }
 };
 
-// Function to update profile details for new users
+// ----------------- UPDATE PROFILE -----------------
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id; // from JWT middleware
-
-    const { fullName, email, gender, dob, anniversary } = req.body;
+    const userId = req.user.id; 
+    const { name, email, gender, dob, anniversary, address } = req.body;
 
     await db.query(
-      "UPDATE users SET name = ?, email = ?, gender = ?, dob = ?, anniversary = ? WHERE id = ?",
-      [fullName, email || null, gender, dob || null, anniversary || null, userId]
+      "UPDATE users SET name = ?, email = ?, gender = ?, dob = ?, anniversary = ?, address = ? WHERE id = ?",
+      [name, email, gender, dob || null, anniversary || null, address, userId]
     );
 
-    res.json({ message: "Profile Updated Successfully" });
-
+    res.json({ success: true, message: "Profile Updated Successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
-
+// ----------------- GET PROFILE -----------------
 exports.getProfile = async (req, res) => {
   try {
-    const { phone } = req.query;
-    const [users] = await db.query("SELECT name, email, gender, dob, anniversary, address FROM users WHERE phone = ?", [phone]);
+    const userId = req.user.id; 
+    const [users] = await db.query(
+      "SELECT name, email, phone, gender, dob, anniversary, address, is_admin FROM users WHERE id = ?", 
+      [userId]
+    );
     
     if (users.length > 0) {
-      return res.json({ user: users[0] });
+      return res.json({ success: true, user: users[0] });
     } else {
       return res.status(404).json({ message: "User not found" });
     }
