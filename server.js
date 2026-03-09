@@ -3,7 +3,9 @@ const cors = require("cors");
 require("dotenv").config();
 const mysql = require("mysql2/promise");
 const jwt = require("jsonwebtoken"); // Ensure you have this for token verification
-
+// At the top of server.js
+const auth = require("./middleware/authMiddleware"); 
+const authRoutes = require("./routes/authRoutes");
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT || 4000,
@@ -27,20 +29,6 @@ global.db = db;
 
 // --- MIDDLEWARE DEFINITIONS ---
 
-// 1. Base Authentication Middleware (Verifies the JWT)
-const auth = (req, res, next) => {
-  const token = req.header("Authorization")?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "No token, authorization denied" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_jwt_secret");
-    req.user = decoded; // This contains the user's id, phone, and is_admin status
-    next();
-  } catch (err) {
-    res.status(401).json({ message: "Token is not valid" });
-  }
-};
-
 // 2. Admin Security Middleware
 const isAdmin = (req, res, next) => {
   // We check the 'is_admin' property that we attached to req.user in the auth middleware
@@ -50,8 +38,6 @@ const isAdmin = (req, res, next) => {
     res.status(403).json({ message: "Access Denied: Admins Only" });
   }
 };
-
-const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const cartRoutes = require("./routes/cartRoutes");

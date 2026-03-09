@@ -65,8 +65,8 @@ exports.verifyOTP = async (req, res) => {
         detail: err.message, // This will show in your browser's Network tab
         stack: err.stack 
     });
-};
-
+}
+  };
 // ----------------- (OPTIONAL) SET PASSWORD -----------------
 exports.setPassword = async (req, res) => {
   try {
@@ -80,7 +80,7 @@ exports.setPassword = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
-};
+}
 
 // ----------------- LOGIN (Traditional Email/Phone + Password) -----------------
 exports.login = async (req, res) => {
@@ -171,5 +171,4 @@ exports.getProfile = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};
 };
