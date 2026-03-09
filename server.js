@@ -2,19 +2,25 @@ const express = require("express");
 const cors = require("cors"); 
 require("dotenv").config();
 const mysql = require("mysql2/promise");
-const jwt = require("jsonwebtoken"); // Ensure you have this for token verification
-// At the top of server.js
+const jwt = require("jsonwebtoken");
+
+// 1. IMPORT MIDDLEWARE & ROUTES
 const auth = require("./middleware/authMiddleware"); 
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+
+// 2. DATABASE CONFIGURATION (TiDB Optimized)
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT || 4000,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  // Update the SSL block to this:
   ssl: {
-    minVersion: 'TLSv1.2',
+    // Required for Render to talk to TiDB Serverless
+    ca: "/etc/ssl/certs/ca-certificates.crt",
     rejectUnauthorized: true,
   },
   waitForConnections: true,
@@ -24,35 +30,25 @@ const db = mysql.createPool({
   keepAliveInitialDelay: 0
 });
 
+// Verify connection on startup
 db.getConnection()
-  .then(() => console.log("✅ MySQL Connected successfully!"))
+  .then((connection) => {
+    console.log("✅ MySQL Connected successfully!");
+    connection.release();
+  })
   .catch((err) => console.error("❌ MySQL Connection failed:", err.message));
 
+// Keeping global.db for your existing controllers
 global.db = db;
-
-// --- MIDDLEWARE DEFINITIONS ---
-
-// 2. Admin Security Middleware
-const isAdmin = (req, res, next) => {
-  // We check the 'is_admin' property that we attached to req.user in the auth middleware
-  if (req.user && req.user.is_admin == 1 || req.user.is_admin === true) {
-    next();
-  } else {
-    res.status(403).json({ message: "Access Denied: Admins Only" });
-  }
-};
-const userRoutes = require("./routes/userRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const cartRoutes = require("./routes/cartRoutes");
 
 const app = express();
 
+// 3. GLOBAL MIDDLEWARE
 app.use(cors({
-  // Replace the placeholder with your actual live URL
   origin: [
     "http://localhost:3000", 
-    "https://chocolicious-frontend.vercel.app", // Your Vercel URL
-    "https://www.chocolicious.in"      // Your custom domain (if you have one)
+    "https://chocolicious-frontend.vercel.app", 
+    "https://www.chocolicious.in"
   ], 
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
@@ -60,30 +56,43 @@ app.use(cors({
 
 app.use(express.json());
 
-// --- ROUTES ---
+// 4. CUSTOM MIDDLEWARE
+const isAdmin = (req, res, next) => {
+  // Handles both boolean true and TiDB tinyint(1)
+  if (req.user && (req.user.is_admin == 1 || req.user.is_admin === true)) {
+    next();
+  } else {
+    res.status(403).json({ message: "Access Denied: Admins Only" });
+  }
+};
 
+// 5. BASE ROUTES
 app.get("/", (req, res) => {
-  res.send("Server working");
+  res.send("Chocolicious API is working");
 });
 
+// 6. MODULE ROUTES
+app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes); 
+app.use("/api/orders", orderRoutes);
+app.use("/api/cart", cartRoutes);
+
+// 7. PRODUCT & CUSTOMIZATION ROUTES
 app.get("/api/products", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM products");
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ message: "Server error fetching products", error: err.message });
+    res.status(500).json({ message: "Error fetching products", error: err.message });
   }
 });
 
-// MODIFIED: Block Admin from adding customizations
 app.post("/api/customizations/add", auth, async (req, res) => {
-  if (req.user.is_admin === 1) {
-    return res.status(403).json({ message: "Admins cannot place custom orders." });
-  }
+  if (req.user.is_admin == 1) return res.status(403).json({ message: "Admins cannot place custom orders." });
+  
   const { phone, order_type, custom_info, price, image_url } = req.body;
-  if (!phone || phone === "null" || !order_type || !price) {
-    return res.status(400).json({ message: "Missing required data." });
-  }
+  if (!phone || phone === "null" || !order_type || !price) return res.status(400).json({ message: "Missing required data." });
+
   try {
     const query = "INSERT INTO customizations (phone, order_type, custom_info, price, image_url) VALUES (?, ?, ?, ?, ?)";
     await db.query(query, [phone, order_type, custom_info, price, image_url || null]);
@@ -93,11 +102,9 @@ app.post("/api/customizations/add", auth, async (req, res) => {
   }
 });
 
-// MODIFIED: Block Admin from adding to cart
 app.post("/api/cart/add", auth, async (req, res) => {
-  if (req.user.is_admin === 1) {
-    return res.status(403).json({ message: "Shopping is disabled for Admin accounts." });
-  }
+  if (req.user.is_admin == 1) return res.status(403).json({ message: "Shopping disabled for Admin." });
+  
   const { phone, product_name, qty, price, custom_info } = req.body;
   try {
     const query = "INSERT INTO cart (phone, product_name, qty, price, custom_info) VALUES (?, ?, ?, ?, ?)";
@@ -108,7 +115,7 @@ app.post("/api/cart/add", auth, async (req, res) => {
   }
 });
 
-// SECURED: Only Admins can see all orders
+// 8. ADMIN PROTECTED ROUTES
 app.get("/api/admin/orders", auth, isAdmin, async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM orders ORDER BY order_id DESC");
@@ -118,35 +125,26 @@ app.get("/api/admin/orders", auth, isAdmin, async (req, res) => {
   }
 });
 
-// SECURED: Only Admins can confirm payments
-app.post("/api/admin/payments/confirm", auth, isAdmin, async (req, res) => {
-  const { order_id, payment_mode } = req.body;
-  const payment_status = "Completed";
+app.put("/api/admin/orders/status", auth, isAdmin, async (req, res) => {
+  const { order_id, order_status } = req.body;
   try {
-    await db.query(
-      "INSERT INTO payment (order_id, payment_mode, payment_status, payment_date) VALUES (?, ?, ?, NOW())",
-      [order_id, payment_mode, payment_status]
-    );
-    const updateOrdersSql = `
-      UPDATE orders 
-      SET order_status = 'Delivered', payment_status = 'Completed', payment_mode = ? 
-      WHERE order_id = ?
-    `;
-    await db.query(updateOrdersSql, [payment_mode, order_id]);
-    res.status(200).json({ success: true });
+    const query = "UPDATE orders SET order_status = ? WHERE order_id = ?";
+    const [result] = await db.query(query, [order_status, order_id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Order not found" });
+    res.json({ success: true, message: "Status updated!" });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to update status" });
   }
 });
 
-// SECURED: Only Admins can update inventory
-app.put("/api/admin/inventory/update", auth, isAdmin, async (req, res) => {
-  const { item_id, new_quantity } = req.body;
+app.post("/api/admin/payments/confirm", auth, isAdmin, async (req, res) => {
+  const { order_id, payment_mode } = req.body;
   try {
-    await db.query("UPDATE inventory SET quantity = ? WHERE item_id = ?", [new_quantity, item_id]);
-    res.json({ message: "Inventory updated!" });
+    await db.query("INSERT INTO payment (order_id, payment_mode, payment_status, payment_date) VALUES (?, ?, 'Completed', NOW())", [order_id, payment_mode]);
+    await db.query("UPDATE orders SET order_status = 'Delivered', payment_status = 'Completed', payment_mode = ? WHERE order_id = ?", [payment_mode, order_id]);
+    res.status(200).json({ success: true });
   } catch (err) {
-    res.status(500).send(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -159,92 +157,50 @@ app.get("/api/inventory", async (req, res) => {
   }
 });
 
-// ADD THIS to your backend (server.js)
-app.put("/api/admin/orders/status", auth, isAdmin, async (req, res) => {
-  const { order_id, order_status } = req.body;
+app.put("/api/admin/inventory/update", auth, isAdmin, async (req, res) => {
+  const { item_id, new_quantity } = req.body;
   try {
-    console.log(`Updating Order ${order_id} to ${order_status}`);
-
-    const query = "UPDATE orders SET order_status = ? WHERE order_id = ?";
-    const [result] = await db.query(query, [order_status, order_id]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-    res.json({ success: true, message: "Status updated successfully!" });
+    await db.query("UPDATE inventory SET quantity = ? WHERE item_id = ?", [new_quantity, item_id]);
+    res.json({ message: "Inventory updated!" });
   } catch (err) {
-    console.error("Status Update Error:", err);
-    res.status(500).json({ error: "Failed to update status" });
-  }
-});
-
-app.post("/api/login", async (req, res) => {
-  const { phone, password } = req.body;
-  const [rows] = await db.query("SELECT id, phone, name, is_admin FROM users WHERE phone = ?", [phone]);
-  const user = rows[0];
-
-  if (user) {
-    // Note: In a real app, generate a real JWT here using jwt.sign({ id: user.id, is_admin: user.is_admin }, ...)
-    res.json({
-      success: true,
-      token: "mock_token_for_now", 
-      user: { phone: user.phone, name: user.name, is_admin: user.is_admin }
-    });
+    res.status(500).send(err);
   }
 });
 
 app.post("/api/admin/inventory/add", auth, isAdmin, async (req, res) => {
   const { item_name, category, quantity, unit } = req.body;
   try {
-    const query = "INSERT INTO inventory (item_name, category, quantity, unit) VALUES (?, ?, ?, ?)";
-    await db.query(query, [item_name, category, quantity, unit]);
+    await db.query("INSERT INTO inventory (item_name, category, quantity, unit) VALUES (?, ?, ?, ?)", [item_name, category, quantity, unit]);
     res.status(201).json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// SECURED: Only Admins can delete inventory items
 app.delete("/api/admin/inventory/delete/:id", auth, isAdmin, async (req, res) => {
-  const { id } = req.params;
   try {
-    const [result] = await db.query("DELETE FROM inventory WHERE item_id = ?", [id]);
-    
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Item not found" });
-    }
-    
-    res.json({ message: "Inventory item deleted successfully" });
+    const [result] = await db.query("DELETE FROM inventory WHERE item_id = ?", [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Item not found" });
+    res.json({ message: "Deleted successfully" });
   } catch (err) {
-    console.error("Delete Inventory Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/contact', (req, res) => {
+// 9. PUBLIC UTILITY ROUTES
+app.post('/api/contact', async (req, res) => {
     const { firstName, lastName, mobile, email, reqDate, city, query } = req.body;
-    
-    const sql = `INSERT INTO contact_messages 
-    (first_name, last_name, mobile, email, req_date, city, query_text) 
-    VALUES (?, ?, ?, ?, ?, ?, ?)`;
-
-    db.query(sql, [firstName, lastName, mobile, email, reqDate, city, query], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: "Database error" });
-        }
+    try {
+        const sql = "INSERT INTO contact_messages (first_name, last_name, mobile, email, req_date, city, query_text) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        await db.query(sql, [firstName, lastName, mobile, email, reqDate, city, query]);
         res.status(200).json({ message: "Message sent successfully!" });
-    });
+    } catch (err) {
+        res.status(500).json({ error: "Database error" });
+    }
 });
 
-// ... Keep your other cart/delete routes below as they were ...
-
-app.use("/api/auth", authRoutes);
-app.use("/api/user", userRoutes); 
-app.use("/api/orders", orderRoutes);
-app.use("/api/cart", cartRoutes);
-
-const PORT = process.env.PORT || 10000; // Render usually uses 10000
+// 10. SERVER STARTUP
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is live on port ${PORT}`);
 });
