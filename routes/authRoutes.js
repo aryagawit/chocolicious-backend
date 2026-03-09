@@ -5,10 +5,12 @@ const auth = require("../middleware/authMiddleware");
 const {
   login,
   updateProfile,
+  signup,
   getProfile,
 } = require("../controllers/authControllers");
 
 router.post("/login", login);
+router.post("/signup", signup);
 router.post("/update-profile", auth, updateProfile);
 router.get("/profile", auth, getProfile);
 
