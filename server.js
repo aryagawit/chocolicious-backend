@@ -12,13 +12,16 @@ const db = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  // Update the SSL block to this:
   ssl: {
     minVersion: 'TLSv1.2',
-    rejectUnauthorized: true
+    rejectUnauthorized: true,
   },
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
 
 db.getConnection()
