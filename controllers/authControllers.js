@@ -33,30 +33,49 @@ exports.signup = async (req, res) => {
   }
 };
 
-// ----------------- LOGIN -----------------
+/// ----------------- LOGIN (Final Corrected) -----------------
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 1. Fetch user from DB
     const [users] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
     if (users.length === 0) return res.status(400).json({ message: "User not found" });
 
     const user = users[0];
+
+    // 2. Compare Password
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ message: "Invalid credentials" });
 
+    // 3. Create Payload (Ensuring 'id' matches your table column name)
+    // If your DB column is 'id', use user.id. If it's 'user_id', use user.user_id.
+    const payload = {
+      id: user.id, 
+      is_admin: user.is_admin 
+    };
+
+    // 4. Generate Token
     const token = jwt.sign(
-      { id: user.id, is_admin: user.is_admin }, 
+      payload, 
       process.env.JWT_SECRET, 
       { expiresIn: "24h" }
     );
 
+    // 5. Send Response
     res.json({ 
       success: true, 
       token, 
-      user: { id: user.id, name: user.name, email: user.email, phone: user.phone, is_admin: user.is_admin } 
+      user: { 
+        id: user.id, 
+        name: user.name, 
+        email: user.email, 
+        phone: user.phone, 
+        is_admin: user.is_admin 
+      } 
     });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

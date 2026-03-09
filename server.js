@@ -35,11 +35,13 @@ app.use(express.json());
 
 // 4. ADMIN SECURITY MIDDLEWARE
 const isAdmin = (req, res, next) => {
-  console.log("Checking Admin Status for User:", req.user); 
+  console.log("User data from Token:", req.user); // THIS IS KEY for debugging
+  
+  // Use loose equality (==) to handle both string "1" and number 1
   if (req.user && (req.user.is_admin == 1 || req.user.is_admin === true)) {
     next();
   } else {
-    console.log("⛔ Access Denied: User is not an admin or req.user is missing.");
+    console.log("⛔ Access Denied: User is not an admin.");
     res.status(403).json({ success: false, message: "Access Denied: Admins Only" });
   }
 };
@@ -144,3 +146,19 @@ app.delete("/api/admin/inventory/delete/:id", auth, isAdmin, async (req, res) =>
   }
 });
 
+// --- CUSTOMER QUERIES ---
+app.get("/api/admin/queries", auth, isAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT * FROM customer_queries ORDER BY id DESC");
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch queries" });
+  }
+});
+
+app.get("/", (req, res) => res.send("Chocolicious API is live."));
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
