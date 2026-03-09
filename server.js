@@ -33,11 +33,19 @@ app.use(cors({
 app.use(express.json());
 
 // 4. ADMIN MIDDLEWARE
+// 4. ADMIN MIDDLEWARE (Updated)
 const isAdmin = (req, res, next) => {
+  // Debugging: This will show up in your Render Logs
+  console.log("Checking Admin Status for User:", req.user); 
+
   if (req.user && (req.user.is_admin == 1 || req.user.is_admin === true)) {
     next();
   } else {
-    res.status(403).json({ message: "Access Denied: Admins Only" });
+    console.log("⛔ Access Denied: User is not an admin or req.user is missing.");
+    res.status(403).json({ 
+      success: false, 
+      message: "Access Denied: Admins Only" 
+    });
   }
 };
 
