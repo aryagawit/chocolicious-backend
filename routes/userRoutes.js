@@ -54,13 +54,16 @@ router.put("/profile", auth, async (req, res) => {
   try {
     const { name, phone, email, gender, dob, anniversary, address } = req.body;
 
-    // 1. Format for NULL safety (Treat empty strings as NULL for the UNIQUE constraint)
+    // 1. Debug: Check what the frontend actually sent
+    console.log("Incoming Data:", { name, phone, email });
+
+    // 2. Format for SQL (Crucial for the UNIQUE constraint)
     const fPhone = phone && phone.trim() !== "" ? phone : null;
     const fEmail = email && email.trim() !== "" ? email : null;
     const fDob = dob && dob !== "" ? dob : null;
     const fAnniversary = anniversary && anniversary !== "" ? anniversary : null;
 
-    // 2. The Query (Check every comma and every '?')
+    // 3. The Query (Matched exactly to the array below)
     const sql = `
       UPDATE users 
       SET name = ?, 
@@ -73,31 +76,32 @@ router.put("/profile", auth, async (req, res) => {
       WHERE id = ?
     `;
 
-    // 3. The Array (MUST match the order of '?' above exactly)
     const params = [
       name,         // 1st ?
-      fPhone,       // 2nd ? (Previously missing/shifted)
+      fPhone,       // 2nd ? -> This is your 'phone' column
       fEmail,       // 3rd ?
       gender,       // 4th ?
       fDob,         // 5th ?
       fAnniversary, // 6th ?
       address,      // 7th ?
-      req.user.id   // 8th ? (The WHERE clause)
+      req.user.id   // 8th ?
     ];
 
-    await db.query(sql, params);
+    const [result] = await db.query(sql, params);
+    
+    console.log("DB Update Result:", result);
 
-    res.json({ success: true, message: "Profile updated successfully! 🧁" });
+    res.json({ success: true, message: "Profile updated! 🧁" });
 
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         success: false, 
-        message: "This phone number is already registered to another account." 
+        message: "This phone number is already linked to another account." 
       });
     }
-    console.error("Database Error:", err);
-    res.status(500).json({ success: false, message: "Failed to update profile." });
+    console.error("SQL Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
