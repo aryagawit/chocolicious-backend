@@ -144,19 +144,3 @@ app.delete("/api/admin/inventory/delete/:id", auth, isAdmin, async (req, res) =>
   }
 });
 
-// --- CUSTOMER QUERIES ---
-app.get("/api/admin/queries", auth, isAdmin, async (req, res) => {
-  try {
-    const [rows] = await db.query("SELECT * FROM customer_queries ORDER BY id DESC");
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch queries" });
-  }
-});
-
-app.get("/", (req, res) => res.send("Chocolicious API is live."));
-
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
