@@ -41,32 +41,41 @@ exports.requestOTP = async (req, res) => {
 exports.verifyOTP = async (req, res) => {
   try {
     const { phone, otp } = req.body;
+    // 1. Check if user exists with this OTP
     const [users] = await db.query("SELECT * FROM users WHERE phone = ? AND otp = ?", [phone, otp]);
 
-    if (users.length === 0) return res.status(400).json({ message: "Invalid OTP" });
+    if (users.length === 0) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
 
     const user = users[0];
+
+    // 2. Update user status
     await db.query("UPDATE users SET is_verified = TRUE, otp = NULL WHERE id = ?", [user.id]);
 
-    const token = jwt.sign({ id: user.id, is_admin: user.is_admin }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    // 3. Generate JWT (Ensure JWT_SECRET is in your Render Environment Variables)
+    const token = jwt.sign(
+      { id: user.id, is_admin: user.is_admin }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: "7d" }
+    );
 
-  res.json({ 
-  success: true, // Helpful for the frontend check
-  token, 
-  phone: user.phone, // Adding this to match your frontend destructuring
-  name: user.name,
-  is_admin: user.is_admin, // CRITICAL: This enables the Admin Dashboard
-  isNewUser: !user.name 
-});
-}catch (err) {
-    console.error("DEBUG ERROR:", err); // This shows in Render Logs
-    res.status(500).json({ 
-        message: "Server error", 
-        detail: err.message, // This will show in your browser's Network tab
-        stack: err.stack 
+    // 4. Send Response (Using 'name' to match your DB column)
+    res.json({ 
+      success: true, 
+      token, 
+      user: {
+        phone: user.phone, 
+        name: user.name, 
+        is_admin: user.is_admin 
+      }
     });
-}
-  };
+  } catch (err) {
+    console.error("Auth Error:", err);
+    // This prevents the "pending" hang by always sending a response
+    res.status(500).json({ message: "Server error", detail: err.message });
+  }
+};
 // ----------------- (OPTIONAL) SET PASSWORD -----------------
 exports.setPassword = async (req, res) => {
   try {
