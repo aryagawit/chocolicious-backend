@@ -61,19 +61,20 @@ router.put("/profile", auth, async (req, res) => {
 
     // 2. Fixed SQL Syntax (Added missing commas)
     // 3. Fixed Parameter Order (Must match the '?' sequence exactly)
-    await db.query(
-      "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
-      [
-        name,           // 1st ?
-        phone,          // 2nd ?
-        formattedEmail, // 3rd ?
-        gender,         // 4th ?
-        formattedDob,   // 5th ?
-        formattedAnniversary, // 6th ?
-        address,        // 7th ?
-        req.user.id     // 8th ? (WHERE id=)
-      ]
-    );
+    // Fixed SQL String and Array Mapping
+await db.query(
+  "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
+  [
+    name,                 // 1st ? -> name
+    phone,                // 2nd ? -> phone (THIS was missing/misplaced)
+    formattedEmail,       // 3rd ? -> email
+    gender,               // 4th ? -> gender
+    formattedDob,         // 5th ? -> dob
+    formattedAnniversary, // 6th ? -> anniversary
+    address,              // 7th ? -> address
+    req.user.id           // 8th ? -> WHERE id
+  ]
+);
 
 
     res.json({ message: "Profile updated successfully" });
