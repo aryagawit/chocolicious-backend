@@ -54,40 +54,50 @@ router.put("/profile", auth, async (req, res) => {
   try {
     const { name, phone, email, gender, dob, anniversary, address } = req.body;
 
-    // 1. Format values for SQL (Handle empty strings as NULL)
-    const formattedPhone = phone && phone.trim() !== "" ? phone : null;
-    const formattedEmail = email && email.trim() !== "" ? email : null;
-    const formattedDob = dob && dob !== "" ? dob : null;
-    const formattedAnniversary = anniversary && anniversary !== "" ? anniversary : null;
+    // 1. Format for NULL safety (Treat empty strings as NULL for the UNIQUE constraint)
+    const fPhone = phone && phone.trim() !== "" ? phone : null;
+    const fEmail = email && email.trim() !== "" ? email : null;
+    const fDob = dob && dob !== "" ? dob : null;
+    const fAnniversary = anniversary && anniversary !== "" ? anniversary : null;
 
-    // 2. Updated SQL with correct commas and parameter order
-    const [result] = await db.query(
-      "UPDATE users SET name=?, phone=?, email=?, gender=?, dob=?, anniversary=?, address=? WHERE id=?",
-      [
-        name,                 // 1st ?
-        formattedPhone,       // 2nd ? -> Handles the UNIQUE constraint safely
-        formattedEmail,       // 3rd ?
-        gender,               // 4th ?
-        formattedDob,         // 5th ?
-        formattedAnniversary, // 6th ?
-        address,              // 7th ?
-        req.user.id           // 8th ? (WHERE id=)
-      ]
-    );
+    // 2. The Query (Check every comma and every '?')
+    const sql = `
+      UPDATE users 
+      SET name = ?, 
+          phone = ?, 
+          email = ?, 
+          gender = ?, 
+          dob = ?, 
+          anniversary = ?, 
+          address = ? 
+      WHERE id = ?
+    `;
 
-    res.json({ success: true, message: "Profile updated! 🧁" });
+    // 3. The Array (MUST match the order of '?' above exactly)
+    const params = [
+      name,         // 1st ?
+      fPhone,       // 2nd ? (Previously missing/shifted)
+      fEmail,       // 3rd ?
+      gender,       // 4th ?
+      fDob,         // 5th ?
+      fAnniversary, // 6th ?
+      address,      // 7th ?
+      req.user.id   // 8th ? (The WHERE clause)
+    ];
+
+    await db.query(sql, params);
+
+    res.json({ success: true, message: "Profile updated successfully! 🧁" });
 
   } catch (err) {
-    // 3. Catch Duplicate Entry Error (Error Code 1062)
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ 
         success: false, 
-        message: "This phone number or email is already in use by another account." 
+        message: "This phone number is already registered to another account." 
       });
     }
-    
-    console.error("Profile Update Error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Database Error:", err);
+    res.status(500).json({ success: false, message: "Failed to update profile." });
   }
 });
 
