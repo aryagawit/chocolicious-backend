@@ -41,38 +41,42 @@ exports.requestOTP = async (req, res) => {
 exports.verifyOTP = async (req, res) => {
   try {
     const { phone, otp } = req.body;
-    // 1. Check if user exists with this OTP
+    
+    // 1. Log the attempt for debugging (check your Render logs)
+    console.log(`Attempting verification for ${phone} with OTP: ${otp}`);
+
+    // 2. Fetch user (ensure phone number format matches what was stored)
     const [users] = await db.query("SELECT * FROM users WHERE phone = ? AND otp = ?", [phone, otp]);
 
     if (users.length === 0) {
+      // This is where your "Invalid OTP" error is coming from
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
     const user = users[0];
 
-    // 2. Update user status
+    // 3. Mark as verified and CLEAR the OTP so it can't be reused
     await db.query("UPDATE users SET is_verified = TRUE, otp = NULL WHERE id = ?", [user.id]);
 
-    // 3. Generate JWT (Ensure JWT_SECRET is in your Render Environment Variables)
+    // 4. Generate Token
     const token = jwt.sign(
       { id: user.id, is_admin: user.is_admin }, 
       process.env.JWT_SECRET, 
       { expiresIn: "7d" }
     );
 
-    // 4. Send Response (Using 'name' to match your DB column)
+    // 5. Success Response
     res.json({ 
       success: true, 
       token, 
       user: {
         phone: user.phone, 
-        name: user.name, 
+        name: user.name || "Valued Customer", // Fallback if name is null
         is_admin: user.is_admin 
       }
     });
   } catch (err) {
     console.error("Auth Error:", err);
-    // This prevents the "pending" hang by always sending a response
     res.status(500).json({ message: "Server error", detail: err.message });
   }
 };
