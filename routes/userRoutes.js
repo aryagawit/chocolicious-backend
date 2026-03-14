@@ -53,7 +53,12 @@ router.get("/profile", auth, async (req, res) => {
 router.put("/profile", auth, async (req, res) => {
   try {
     const { name, phone, email, gender, dob, anniversary, address } = req.body;
-
+    if (!phone || phone.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required"
+      });
+    } 
     // 1. Debug: Check what the frontend actually sent
     console.log("Incoming Data:", { name, phone, email });
 
@@ -72,7 +77,7 @@ router.put("/profile", auth, async (req, res) => {
           gender = ?, 
           dob = ?, 
           anniversary = ?, 
-          address = ? 
+          address = ?
       WHERE id = ?
     `;
 

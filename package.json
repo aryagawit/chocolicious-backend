@@ -9,17 +9,25 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.17.1",
+    "mysql2": "^3.19.1",
     "twilio": "^5.12.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aryagawit/chocolicious-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aryagawit/chocolicious-backend/issues"
+  },
+  "homepage": "https://github.com/aryagawit/chocolicious-backend#readme",
+  "description": ""
 }
