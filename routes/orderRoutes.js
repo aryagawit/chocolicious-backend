@@ -45,6 +45,7 @@ router.get("/my-orders", auth, async (req, res) => {
         order_date, 
         product_name, 
         order_status AS status,
+        name AS fullName,
         address
       FROM orders 
       WHERE customer_id = ? 
