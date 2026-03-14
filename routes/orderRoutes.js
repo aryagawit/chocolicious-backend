@@ -5,14 +5,14 @@ const db = require("../config/db");
 
 router.post("/place-order", auth, async (req, res) => {
   try {
-    const { orderName, amount, phone, address, deliveryDate } = req.body;
+    const { orderName, amount, phone, address, deliveryDate, fullName } = req.body;
     const customerId = req.user.id; 
 
     // FIXED: Now has 7 columns and 7 corresponding values
     const [result] = await db.query(
       `INSERT INTO orders 
-      (customer_id, order_date, order_status, product_name, price, phone, address) 
-      VALUES (?, NOW(), 'Pending', ?, ?, ?, ?)`,
+      (customer_id, order_date, order_status, product_name, price, phone, address, name) 
+      VALUES (?, NOW(), 'Pending', ?, ?, ?, ?, ?)`,
       [customerId, orderName, amount, phone, address]
     );
 
@@ -25,7 +25,8 @@ router.post("/place-order", auth, async (req, res) => {
       amount,
       phone,
       deliveryDate,
-      address: address
+      address: address,
+      fullName
     });
   } catch (err) {
     console.error("Database Error:", err);
@@ -50,8 +51,8 @@ router.get("/my-orders", auth, async (req, res) => {
       ORDER BY order_date DESC`,
       [customerId]
     );
-    res.json({ success: true, orders: rows });
-  } catch (err) {
+res.json({ success: true, orders: rows });
+} catch (err) {
     console.error("SQL Error in my-orders:", err.message);
     res.status(500).json({ success: false, message: "Database error" });
   }
