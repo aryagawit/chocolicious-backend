@@ -11,6 +11,22 @@ router.get("/get-cart/:phone", auth, async (req, res) => {
     res.status(500).json({ message: "Error fetching cart" });
   }
 });
+router.get("/customizations", auth, async (req, res) => {
+  const [rows] = await db.query("SELECT * FROM customizations ORDER BY created_at DESC");
+  res.json({ customizations: rows });
+});
+
+router.put("/customizations/status", auth, async (req, res) => {
+  const { id, status } = req.body;
+
+  await db.query(
+    "UPDATE customizations SET status=? WHERE id=?",
+    [status, id]
+  );
+
+  res.json({ success: true });
+});
+
 // routes/cartRoutes.js
 router.post("/add", auth, async (req, res) => {
   const { phone, product_name, qty, price, size } = req.body;
