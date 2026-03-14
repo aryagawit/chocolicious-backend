@@ -26,6 +26,26 @@ router.put("/customizations/status", auth, async (req, res) => {
 
   res.json({ success: true });
 });
+router.post("/customizations/add", auth, async (req, res) => {
+  try {
+    const { phone, order_type, custom_info, price, image_url } = req.body;
+
+    const [result] = await db.query(
+      `INSERT INTO customizations (phone, order_type, custom_info, price, image_url)
+       VALUES (?, ?, ?, ?, ?)`,
+      [phone, order_type, custom_info, price, image_url]
+    );
+
+    res.json({
+      success: true,
+      id: result.insertId
+    });
+
+  } catch (err) {
+    console.error("Customization insert error:", err);
+    res.status(500).json({ error: "Failed to add customization" });
+  }
+});
 
 // routes/cartRoutes.js
 router.post("/add", auth, async (req, res) => {
