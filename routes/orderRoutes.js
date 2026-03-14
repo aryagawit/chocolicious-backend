@@ -13,7 +13,7 @@ router.post("/place-order", auth, async (req, res) => {
       `INSERT INTO orders 
       (customer_id, order_date, order_status, product_name, price, phone, address, name) 
       VALUES (?, NOW(), 'Pending', ?, ?, ?, ?, ?)`,
-      [customerId, orderName, amount, phone, address]
+      [customerId, orderName, amount, phone, address, fullName]
     );
 
     const officialOrderId = result.insertId;
@@ -45,7 +45,6 @@ router.get("/my-orders", auth, async (req, res) => {
         order_date, 
         product_name, 
         order_status AS status,
-        name AS fullName,
         address
       FROM orders 
       WHERE customer_id = ? 
